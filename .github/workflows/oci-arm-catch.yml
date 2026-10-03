@@ -1,0 +1,84 @@
+name: OCI ARM Catch
+
+on:
+  # Runs every 30 min. Each run loops for up to MAX_RUNTIME_MINUTES, and the
+  # concurrency group below keeps only one run active (the next one queues),
+  # so attempts continue back-to-back around the clock.
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      max_runtime_minutes:
+        description: "How long this run keeps retrying (max ~340)"
+        default: "340"
+
+concurrency:
+  group: oci-arm-catch
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write   # open an issue (=> email) when the instance is created
+  actions: write  # disable this workflow after success
+
+jobs:
+  catch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install OCI CLI
+        run: |
+          pipx install oci-cli
+          oci --version
+
+      - name: Write OCI config
+        env:
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+        run: |
+          mkdir -p ~/.oci
+          printf '%s\n' "$OCI_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem
+          cat > ~/.oci/config <<EOF
+          [DEFAULT]
+          user=${OCI_USER_OCID}
+          fingerprint=${OCI_FINGERPRINT}
+          tenancy=${OCI_TENANCY_OCID}
+          region=${OCI_REGION}
+          key_file=${HOME}/.oci/oci_api_key.pem
+          EOF
+          chmod 600 ~/.oci/config
+          oci iam region list --output table > /dev/null && echo "OCI auth OK"
+
+      - name: Try to launch A1 instance
+        id: launch
+        env:
+          COMPARTMENT_ID: ${{ secrets.OCI_TENANCY_OCID }}
+          AVAILABILITY_DOMAIN: ${{ vars.AVAILABILITY_DOMAIN || 'FgwR:AP-MUMBAI-1-AD-1' }}
+          IMAGE_ID: ${{ vars.IMAGE_ID || 'ocid1.image.oc1.ap-mumbai-1.aaaaaaaa2jurqb3jm7hlpqw3au35loaqjkcozbyh7znn4jnfu5zbrgfulwia' }}
+          DISPLAY_NAME: ${{ vars.DISPLAY_NAME || 'Ankit' }}
+          SUBNET_NAME: ${{ vars.SUBNET_NAME || 'subnet-20261003-0740' }}
+          OCPUS: ${{ vars.OCPUS || '2' }}
+          MEMORY_GB: ${{ vars.MEMORY_GB || '12' }}
+          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+          MAX_RUNTIME_MINUTES: ${{ inputs.max_runtime_minutes || vars.MAX_RUNTIME_MINUTES || '340' }}
+          OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING: "True"
+        run: bash scripts/oci-arm-catch.sh
+
+      - name: Notify and stop retrying
+        if: steps.launch.outputs.created == 'true' || steps.launch.outputs.created == 'already-exists'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ steps.launch.outputs.created }}
+        run: |
+          if [ "$RESULT" = "true" ]; then
+            gh issue create \
+              --title "🎉 OCI Ampere instance created" \
+              --body "The A1 instance was launched by run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. Check the OCI console for its public IP. This workflow has been disabled."
+          fi
+          gh workflow disable "${{ github.workflow }}" --repo "${{ github.repository }}"
