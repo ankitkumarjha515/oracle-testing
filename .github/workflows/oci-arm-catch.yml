@@ -66,6 +66,8 @@ jobs:
           OCPUS: ${{ vars.OCPUS || '2' }}
           MEMORY_GB: ${{ vars.MEMORY_GB || '12' }}
           SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+          RETRY_SECONDS: ${{ vars.RETRY_SECONDS || '60' }}
+          RATE_LIMIT_BACKOFF_SECONDS: ${{ vars.RATE_LIMIT_BACKOFF_SECONDS || '150' }}
           MAX_RUNTIME_MINUTES: ${{ inputs.max_runtime_minutes || vars.MAX_RUNTIME_MINUTES || '340' }}
           OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING: "True"
         run: bash scripts/oci-arm-catch.sh

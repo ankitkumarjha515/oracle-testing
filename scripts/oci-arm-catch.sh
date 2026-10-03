@@ -16,7 +16,7 @@ SUBNET_ID="${SUBNET_ID:-}"
 OCPUS="${OCPUS:-2}"
 MEMORY_GB="${MEMORY_GB:-12}"
 RETRY_SECONDS="${RETRY_SECONDS:-60}"
-RATE_LIMIT_BACKOFF_SECONDS="${RATE_LIMIT_BACKOFF_SECONDS:-300}"
+RATE_LIMIT_BACKOFF_SECONDS="${RATE_LIMIT_BACKOFF_SECONDS:-150}"
 # Stop the loop after this many minutes so the job ends cleanly before
 # GitHub's 6-hour job limit; the next scheduled run picks up from there.
 MAX_RUNTIME_MINUTES="${MAX_RUNTIME_MINUTES:-340}"
