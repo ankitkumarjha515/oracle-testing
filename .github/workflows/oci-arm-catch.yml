@@ -83,4 +83,5 @@ jobs:
               --title "🎉 OCI Ampere instance created" \
               --body "The A1 instance was launched by run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. Check the OCI console for its public IP. This workflow has been disabled."
           fi
-          gh workflow disable "${{ github.workflow }}" --repo "${{ github.repository }}"
+          # Already disabled if an earlier run succeeded, so do not fail on that.
+          gh workflow disable oci-arm-catch.yml --repo "${{ github.repository }}" || true
