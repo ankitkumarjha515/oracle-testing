@@ -77,7 +77,11 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
     echo "------------------------------------------------"
     echo "Attempt #$attempt at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 
-    oci compute instance launch \
+    # --no-retry: by default the OCI CLI silently retries 429/5xx responses
+    # (incl. "Out of host capacity") ~8 times over ~100s, so one "attempt" was
+    # really a burst of LaunchInstance calls that tripped the rate limit on
+    # every other attempt. One attempt = one request keeps us under the limit.
+    oci --no-retry compute instance launch \
         --availability-domain "$AVAILABILITY_DOMAIN" \
         --compartment-id "$COMPARTMENT_ID" \
         --shape "$SHAPE" \
